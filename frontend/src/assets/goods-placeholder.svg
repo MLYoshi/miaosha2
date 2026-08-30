@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
-  <rect width="480" height="360" fill="#f5f5f5"/>
-  <g fill="none" stroke="#bfbfbf" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="170" y="120" width="140" height="105" rx="8"/>
-    <circle cx="205" cy="152" r="12"/>
-    <path d="M182 210 L222 172 L246 194 L266 178 L298 210 Z"/>
-  </g>
-  <text x="240" y="265" text-anchor="middle" font-family="-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="20" fill="#8c8c8c">暂无图片</text>
-</svg>
