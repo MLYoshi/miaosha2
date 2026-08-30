@@ -1,0 +1,50 @@
+### Maven ###
+target/
+!**/src/main/**/target/
+!**/src/test/**/target/
+*.class
+
+### JMeter ###
+jmeter/report/
+jmeter/history/
+jmeter/*.jtl
+jmeter/*.csv
+# benchmarks.csv 是进 Git 的对比表，必须保留
+!jmeter/benchmarks.csv
+jmeter.log
+
+### MySQL ###
+mysql_data/
+
+### IDE ###
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+.settings/
+.project
+.classpath
+.factorypath
+
+### macOS ###
+.DS_Store
+*.DS_Store
+
+### Logs ###
+*.log
+logs/
+
+### Graphify ###
+graphify-out/
+
+### Scratch ###
+.scratch/
+
+### Others ###
+*.tmp
+*.swp
+*~
+
+### CodeBuddy ###
+.codebuddy
