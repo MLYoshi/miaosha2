@@ -82,15 +82,15 @@ services:
       kafka:
         condition: service_healthy
 
-  # 5. 前端：Vite 构建产物由 Nginx 托管，/api 反代到 backend 服务
-  frontend:
-    build:
-      context: ./frontend
-      args:
-        BACKEND_HOST: backend
-        BACKEND_PORT: "8080"
-    container_name: seckill-frontend
-    ports:
-      - "5173:80"
-    depends_on:
-      - backend
+  # # 5. 前端：Vite 构建产物由 Nginx 托管，/api 反代到 backend 服务
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     args:
+  #       BACKEND_HOST: backend
+  #       BACKEND_PORT: "8080"
+  #   container_name: seckill-frontend
+  #   ports:
+  #     - "5173:80"
+  #   depends_on:
+  #     - backend
