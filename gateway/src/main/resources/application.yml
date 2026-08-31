@@ -11,3 +11,11 @@ spring:
           uri: http://localhost:8081
           predicates:
             - Path=/user/**
+        - id: goods-service
+          uri: http://localhost:8082
+          predicates:
+            - Path=/goods/**
+        - id: goods-service-admin
+          uri: http://localhost:8082
+          predicates:
+            - Path=/admin/**

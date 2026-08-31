@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.goods.dao.GoodsMapper">
+
+  <sql id="goodsVoColumns">
+    g.id,
+    g.goods_name,
+    g.goods_title,
+    g.goods_img,
+    g.goods_detail,
+    g.goods_price,
+    g.goods_stock,
+    mg.miaosha_price,
+    mg.stock_count,
+    mg.start_date,
+    mg.end_date
+  </sql>
+
+  <select id="getById" resultType="Goods">
+    SELECT id,
+           goods_name,
+           goods_title,
+           goods_img,
+           goods_detail,
+           goods_price,
+           goods_stock
+    FROM goods
+    WHERE id = #{id}
+  </select>
+
+  <select id="listGoodsVo" resultType="com.example.goods.vo.GoodsVo">
+    SELECT
+    <include refid="goodsVoColumns"/>
+    FROM goods g
+    INNER JOIN miaosha_goods mg ON g.id = mg.goods_id
+    ORDER BY g.id
+  </select>
+
+  <select id="getGoodsVo" resultType="com.example.goods.vo.GoodsVo">
+    SELECT
+    <include refid="goodsVoColumns"/>
+    FROM goods g
+    INNER JOIN miaosha_goods mg ON g.id = mg.goods_id
+    WHERE g.id = #{goodsId}
+  </select>
+
+</mapper>
