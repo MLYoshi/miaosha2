@@ -1,2 +1,38 @@
 server:
   port: 8083
+
+spring:
+  application:
+    name: miaosha-service
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: 6379
+      password: ${REDIS_PASSWORD:123456}
+      timeout: 3000ms
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        enable.idempotence: true
+        # payload 为纯 JSON {userId, goodsId, requestId}，不给 Step 5 消费侧带类型头
+        spring.json.add.type.headers: false
+
+# 预热：经 HTTP 调 goods-service 取 stockCount/endDate
+goods:
+  base-url: ${GOODS_BASE_URL:http://localhost:8082}
+
+# 降级接缝：同步下单指向 order-service（Step 5 端点就绪后生效）
+order:
+  sync-base-url: ${ORDER_SYNC_BASE_URL:http://localhost:8084}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
