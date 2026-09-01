@@ -40,7 +40,8 @@ class MiaoshaResultServiceTest {
   void success_returnsOrderId() {
     store.setStock(GOODS, 5, TTL);
     store.tryMiaosha(GOODS, USER, "req-1");
-    store.markSuccess(GOODS, USER, 7L);
+    // SUCCESS 回写归 order-service（根 AGENTS.md 规则 3），此处用 seedResult 造状态
+    store.seedResult(GOODS, USER, "SUCCESS:7");
 
     MiaoshaResultVo vo = service.query(USER, GOODS);
 

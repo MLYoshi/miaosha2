@@ -44,5 +44,17 @@
     INNER JOIN miaosha_goods mg ON g.id = mg.goods_id
     WHERE g.id = #{goodsId}
   </select>
+  <update id="reduceStock">
+    UPDATE miaosha_goods
+    SET stock_count = stock_count - 1
+    WHERE goods_id = #{goodsId}
+      AND stock_count > 0
+  </update>
+
+  <update id="restoreStock">
+    UPDATE miaosha_goods
+    SET stock_count = stock_count + 1
+    WHERE goods_id = #{goodsId}
+  </update>
 
 </mapper>

@@ -54,11 +54,6 @@ public class InMemoryMiaoshaRedisStore implements MiaoshaRedisStore {
   }
 
   @Override
-  public void markSuccess(Long goodsId, Long userId, Long orderId) {
-    data.put(RedisKeyBuilder.result(goodsId, userId), "SUCCESS:" + orderId);
-  }
-
-  @Override
   public void compensate(Long goodsId, Long userId, String requestId) {
     String userKey = RedisKeyBuilder.user(goodsId, userId);
     if (!requestId.equals(data.get(userKey))) {

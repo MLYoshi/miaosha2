@@ -82,8 +82,9 @@ public class MiaoshaAcceptService {
       log.warn("Kafka 发送失败，降级同步下单 goodsId={} userId={}: {}", goodsId, userId,
           e.getMessage());
       try {
+        // result Key 回写归 order-service（根 AGENTS.md 规则 3）：sync 端点内部
+        // 已由 order-service 自己 markSuccess，本服务不再越权写 miaosha:result:*
         Long orderId = syncOrderClient.createOrder(userId, goodsId);
-        store.markSuccess(goodsId, userId, orderId);
         return MiaoshaAcceptVo.success(orderId);
       } catch (RuntimeException degradeEx) {
         // 降级下单失败：补偿 Redis

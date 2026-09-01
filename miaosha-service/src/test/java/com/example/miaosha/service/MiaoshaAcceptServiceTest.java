@@ -127,7 +127,7 @@ class MiaoshaAcceptServiceTest {
 
   // ---------- Kafka 发送失败降级 ----------
 
-  @Test // 发送失败 → 降级同步下单：用户直接拿单，回写 SUCCESS
+  @Test // 发送失败 → 降级同步下单：用户直接拿单；SUCCESS 由 order-service 回写（规则 3）
   void sendFails_degradesToSyncOrder() {
     store.setStock(GOODS, 5, TTL);
     sender.failSendWith(new RuntimeException("kafka down"));
@@ -138,7 +138,9 @@ class MiaoshaAcceptServiceTest {
     assertThat(result.getStatus()).as("降级落库成功应直接返回成功态").isEqualTo(MiaoshaAcceptVo.Status.SUCCESS);
     assertThat(result.getOrderId()).isEqualTo(7L);
     assertThat(store.stock(GOODS)).isEqualTo(4);
-    assertThat(store.result(GOODS, USER)).isEqualTo("SUCCESS:7");
+    assertThat(store.result(GOODS, USER))
+        .as("本服务不得越权写 result Key（规则 3），保持预扣时的 PROCESSING")
+        .isEqualTo("PROCESSING");
   }
 
   @Test // 发送失败 + 降级也失败 → 补偿 Redis（库存回补、标记清除、result=FAILED），异常上抛

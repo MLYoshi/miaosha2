@@ -25,7 +25,7 @@
 
 1. **`backend/` 是事实基线**：业务行为、DB schema、Redis Lua、Kafka 语义的唯一来源。迁移全程不要删除/重构它，每一步保持原有行为，不做顺手重构。
 2. **数据所有权**：服务只能访问自己的表，跨服务只能通过 HTTP / Kafka 通信，禁止 import 其他服务的 Entity/Mapper。
-3. **Redis**：秒杀 Key（`miaosha:stock|user|result:*`）只由 miaosha-service 维护，其他服务不得私自修改。
+3. **Redis**：秒杀 Key（`miaosha:stock|user|result:*`）分区归属——预扣 Key（`miaosha:stock:*`、`miaosha:user:*`）只由 miaosha-service 维护；结果 Key（`miaosha:result:*`）的回写与补偿（markSuccess/compensate/getResult，补偿 Lua 校验 requestId 归属后才回补库存）归 order-service，尽力而为、失败不得破坏订单事实；其他服务不得私自修改任何秒杀 Key。另有 goods-service 自有的扣减幂等 Key（`goods:deduct:req:{requestId}`，缓存扣减影响行数、TTL 60s，解决扣减响应丢失 × Kafka 重放重复扣减），尽力而为、Redis 故障时降级直接扣减；不属秒杀 Key，不受上述归属约束。
 4. **Kafka**：topic `seckill-order`（DLT: `seckill-order-dlt`）。消息只带必要字段（`requestId`/`userId`/`goodsId`），key 用 UUID 随机打散。发送失败必须有同步落库降级。
 5. **不要过度设计**：按迁移计划逐步引入组件，OpenFeign/注册中心目前明确不做。
 
@@ -39,18 +39,43 @@
 ## 构建
 
 ```bash
-export JAVA_HOME=$(/usr/libexec/java_home -v 17)   # macOS 强制 Java 17
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)   # macOS 强制 Java 17（maven-enforcer 校验）
 
-# 微服务（根目录）
+# 微服务（根目录多模块，-am 自动带上依赖的 common）
 mvn clean package -DskipTests
-mvn -pl <module> spring-boot:run
+mvn -pl <module> -am spring-boot:run
 
-# 旧单体（独立构建）
+# 跑测试（Testcontainers 集成测试，必须先启动 Docker）
+mvn -pl <module> test                       # 某模块全部测试
+mvn -pl <module> test -Dtest=OrderKafkaConsumerTest   # 单个测试类
+mvn -pl <module> test -Dtest=ClassX#methodY           # 单个测试方法
+
+# 旧单体（独立构建，与微服务互不影响）
 cd backend && mvn -B package -DskipTests
 ```
 
 ## 本地中间件
 
-`docker compose up -d mysql redis kafka`：MySQL 3306（root/root，库 `miaosha`）、Redis 6379（密码 123456）、Kafka 9092。
+`docker compose up -d mysql redis kafka`：MySQL 3306（root/root，库 `miaosha`，容器名 `seckill-mysql`）、Redis 6379（密码 123456）、Kafka 9092（KRaft 单节点，auto-create 关闭）。
 
-联调报「未开始/已结束」→ 重跑 `backend/sql/fix-seed-time-window.sql`。更多细节见 `backend/AGENTS.md` 与 `docs/`。
+```bash
+# 新库必做：建表 + 种子数据 + 时间窗对齐（否则秒杀窗口全是 2017 年，接口报「已结束」）
+docker exec -i seckill-mysql mysql -uroot -proot --default-character-set=utf8mb4 \
+  < backend/sql/fix-seed-time-window.sql
+```
+
+- 中间件连接均可用环境变量覆盖：`MYSQL_HOST/PORT`、`REDIS_HOST/PORT`、`KAFKA_BOOTSTRAP_SERVERS`、`GOODS_BASE_URL`。
+- **时区陷阱**：JVM 必须运行在 `Asia/Shanghai`，否则时间窗校验 `checkInWindow` 误判（容器内 compose 已设 `TZ`）。
+- 联调报「未开始/已结束」→ 先重跑上述种子脚本，不要先怀疑代码。更多细节见 `backend/AGENTS.md` 与 `docs/`。
+
+## 命名约定
+
+代码中「秒杀」统一用 `Miaosha` 前缀（类名、mapper、Redis key），不要改成 `Seckill`。唯一例外：Kafka 消息体 `SeckillOrderMessage`（历史命名，新旧两侧各有一份消费/生产副本，字段仅 `requestId`/`userId`/`goodsId`）。
+
+## 跨服务协作要点（读多个文件才能发现的）
+
+- **HTTP 互调不用 OpenFeign**：order-service 通过 `client/GoodsClient`（接口）+ `client/HttpGoodsClient`（RestClient 实现）调 goods-service 的 `InternalGoodsController` 内部接口（商品快照/扣库存/回补库存），地址由 `goods.base-url` 配置。新增跨服务调用照此接缝风格。
+- **Kafka 消息不带类型头**：miaosha-service producer 发纯 JSON，order-service consumer 靠 `spring.json.value.default.type` 指定消费侧消息类（见 order-service `application.yml`）。
+- **gateway 路由**：`/user/**`→8081、`/goods/**`→8082、`/miaosha/**` 与 `/admin/**`→8083。路由地址是写死的 localhost 端口（无注册中心），改端口需同步 `gateway/src/main/resources/application.yml`。
+- **测试基座**：各服务有独立 Testcontainers 基座（order-service 为 `support/AbstractOrderIntegrationTest`，真实 HTTP + 容器内 MySQL/Redis/Kafka，每用例清库）。跑不动通常是 Docker 未启动。
+- **错误码体系**：统一加在 common 的 `CodeMsg`（如 500212 重复下单、500214 库存空、500215 未开始、500216 已结束）。

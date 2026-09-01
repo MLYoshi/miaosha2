@@ -12,9 +12,11 @@ import java.time.Duration;
  * <p>异常契约：
  * <ul>
  *   <li>{@link #tryMiaosha} / {@link #getResult} 连接类异常向上抛，由调用方决定如何处理</li>
- *   <li>{@link #markSuccess} / {@link #compensate} 不得向调用方抛异常——
- *       回写失败不能破坏已完成的数据库事实</li>
+ *   <li>{@link #compensate} 不得向调用方抛异常——补偿失败不能破坏调用方的错误上抛语义</li>
  * </ul>
+ *
+ * <p>result Key 归属（根 AGENTS.md 规则 3）：SUCCESS 回写归 order-service
+ * （sync 端点 / Kafka 消费者），本接缝只预扣（置 PROCESSING）与补偿（记 FAILED）。
  */
 public interface MiaoshaRedisStore {
 
@@ -34,9 +36,6 @@ public interface MiaoshaRedisStore {
    * @param requestId 本次受理请求的全链路标识，落库失败时凭它补偿校验
    */
   TryResult tryMiaosha(Long goodsId, Long userId, String requestId);
-
-  /** DB 下单成功后回写结果 SUCCESS:{orderId}（尽力而为）。 */
-  void markSuccess(Long goodsId, Long userId, Long orderId);
 
   /** DB 下单失败后补偿：仅当用户标记仍是本次 requestId 时回补库存、清标记、记 FAILED。 */
   void compensate(Long goodsId, Long userId, String requestId);

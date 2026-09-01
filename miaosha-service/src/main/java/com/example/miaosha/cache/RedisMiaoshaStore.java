@@ -9,7 +9,8 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 /**
- * 生产 Redis 适配器：Lua 原子预扣库存、结果回写、失败补偿、库存写入。
+ * 生产 Redis 适配器：Lua 原子预扣库存、失败补偿、库存写入。
+ * SUCCESS 回写归 order-service（根 AGENTS.md 规则 3），本类不写 miaosha:result 的成功态。
  *
  * <p>Redis 是第一道库存拦截与防重复下单屏障，数据库仍是最终库存与订单事实来源。
  */
@@ -52,20 +53,6 @@ public class RedisMiaoshaStore implements MiaoshaRedisStore {
       case 2 -> TryResult.REPEAT;
       default -> TryResult.STOCK_EMPTY;
     };
-  }
-
-  @Override
-  public void markSuccess(Long goodsId, Long userId, Long orderId) {
-    try {
-      redisTemplate
-          .opsForValue()
-          .set(
-              RedisKeyBuilder.result(goodsId, userId),
-              "SUCCESS:" + orderId,
-              Duration.ofSeconds(DEFAULT_TTL_SECONDS));
-    } catch (Exception e) {
-      log.warn("markSuccess 失败 goodsId={} userId={}: {}", goodsId, userId, e.getMessage());
-    }
   }
 
   @Override
