@@ -14,12 +14,12 @@
 
 | 服务 | 端口 | 职责 |
 |---|---|---|
-| gateway | 8080 | 只做路由。禁止业务逻辑/DB；WebFlux 技术栈，禁止加 `spring-boot-starter-web` |
-| user-service | 8081 | 用户/登录/JWT。表 `miaosha_user`（不用 `user` 表） |
+| gateway | 8080 | 路由 + JWT 校验（X-User-Id 下发）+ lb:// 服务名负载均衡。禁止业务逻辑/DB/Redis/Kafka；WebFlux 技术栈，禁止加 `spring-boot-starter-web` |
+| user-service | 8081 | 用户/登录/注册，签发 JWT。表 `miaosha_user`（不用 `user` 表） |
 | goods-service | 8082 | 商品/库存/秒杀时间窗。表 `goods` |
 | miaosha-service | 8083 | 秒杀受理、Redis Lua 预扣、Kafka Producer。不负责落库 |
 | order-service | 8084 | Kafka Consumer、订单落库/幂等。表 `order_info`、`miaosha_order` |
-| common | — | 只放共享 DTO/Result/工具。禁止放 Entity、Mapper、业务 Service |
+| common | — | 只放共享 DTO/Result/工具/JwtUtil。禁止放 Entity、Mapper、业务 Service |
 
 ## 核心规则
 
@@ -27,7 +27,7 @@
 2. **数据所有权**：服务只能访问自己的表，跨服务只能通过 HTTP / Kafka 通信，禁止 import 其他服务的 Entity/Mapper。
 3. **Redis**：秒杀 Key（`miaosha:stock|user|result:*`）分区归属——预扣 Key（`miaosha:stock:*`、`miaosha:user:*`）只由 miaosha-service 维护；结果 Key（`miaosha:result:*`）的回写与补偿（markSuccess/compensate/getResult，补偿 Lua 校验 requestId 归属后才回补库存）归 order-service，尽力而为、失败不得破坏订单事实；其他服务不得私自修改任何秒杀 Key。另有 goods-service 自有的扣减幂等 Key（`goods:deduct:req:{requestId}`，缓存扣减影响行数、TTL 60s，解决扣减响应丢失 × Kafka 重放重复扣减），尽力而为、Redis 故障时降级直接扣减；不属秒杀 Key，不受上述归属约束。
 4. **Kafka**：topic `seckill-order`（DLT: `seckill-order-dlt`）。消息只带必要字段（`requestId`/`userId`/`goodsId`），key 用 UUID 随机打散。发送失败必须有同步落库降级。
-5. **不要过度设计**：按迁移计划逐步引入组件，OpenFeign/注册中心目前明确不做。
+5. **不要过度设计**：按迁移计划逐步引入组件，OpenFeign 目前明确不做；服务注册与发现已启用 Nacos（Step 6），路由与跨服务调用统一走服务名负载均衡，不再写死 localhost 端口。
 
 ## 秒杀不变量（绝对不能破坏）
 
@@ -56,7 +56,7 @@ cd backend && mvn -B package -DskipTests
 
 ## 本地中间件
 
-`docker compose up -d mysql redis kafka`：MySQL 3306（root/root，库 `miaosha`，容器名 `seckill-mysql`）、Redis 6379（密码 123456）、Kafka 9092（KRaft 单节点，auto-create 关闭）。
+`docker compose up -d mysql redis kafka nacos`：MySQL 3306（root/root，库 `miaosha`，容器名 `seckill-mysql`）、Redis 6379（密码 123456）、Kafka 9092（KRaft 单节点，auto-create 关闭）、Nacos 8848（HTTP，容器名 `seckill-nacos`，客户端 gRPC 9848，standalone 免鉴权）。
 
 ```bash
 # 新库必做：建表 + 种子数据 + 时间窗对齐（否则秒杀窗口全是 2017 年，接口报「已结束」）
@@ -64,7 +64,7 @@ docker exec -i seckill-mysql mysql -uroot -proot --default-character-set=utf8mb4
   < backend/sql/fix-seed-time-window.sql
 ```
 
-- 中间件连接均可用环境变量覆盖：`MYSQL_HOST/PORT`、`REDIS_HOST/PORT`、`KAFKA_BOOTSTRAP_SERVERS`、`GOODS_BASE_URL`。
+- 中间件连接均可用环境变量覆盖：`MYSQL_HOST/PORT`、`REDIS_HOST/PORT`、`KAFKA_BOOTSTRAP_SERVERS`、`NACOS_SERVER_ADDR`、`GOODS_BASE_URL`、`ORDER_SYNC_BASE_URL`。
 - **时区陷阱**：JVM 必须运行在 `Asia/Shanghai`，否则时间窗校验 `checkInWindow` 误判（容器内 compose 已设 `TZ`）。
 - 联调报「未开始/已结束」→ 先重跑上述种子脚本，不要先怀疑代码。更多细节见 `backend/AGENTS.md` 与 `docs/`。
 
@@ -76,6 +76,9 @@ docker exec -i seckill-mysql mysql -uroot -proot --default-character-set=utf8mb4
 
 - **HTTP 互调不用 OpenFeign**：order-service 通过 `client/GoodsClient`（接口）+ `client/HttpGoodsClient`（RestClient 实现）调 goods-service 的 `InternalGoodsController` 内部接口（商品快照/扣库存/回补库存），地址由 `goods.base-url` 配置。新增跨服务调用照此接缝风格。
 - **Kafka 消息不带类型头**：miaosha-service producer 发纯 JSON，order-service consumer 靠 `spring.json.value.default.type` 指定消费侧消息类（见 order-service `application.yml`）。
-- **gateway 路由**：`/user/**`→8081、`/goods/**`→8082、`/miaosha/**` 与 `/admin/**`→8083。路由地址是写死的 localhost 端口（无注册中心），改端口需同步 `gateway/src/main/resources/application.yml`。
+- **gateway 路由（服务名 lb://）**：`/user/**`→lb://user-service、`/goods/**`→lb://goods-service、`/miaosha/**` 与 `/admin/**`→lb://miaosha-service，经 Nacos 服务发现 + Spring Cloud LoadBalancer 分发，不再写死 localhost 端口。
+- **JWT 鉴权已上移 gateway**：`filter/JwtGlobalFilter` 无条件剥离外部伪造的 `X-User-Id`，校验 `Authorization: Bearer` 成功后下发 `X-User-Id: {userId}` 给下游；白名单 `/user/login`、`/user/register` 放行；失败返回 401 + Result 同构 JSON（`CodeMsg.SESSION_ERROR`）。
+- **业务服务身份上下文**：user/goods/miaosha 的 `JwtInterceptor` 已换成 `UserContextInterceptor`（读 `X-User-Id` → `request.setAttribute("userId")`），Controller 取值方式不变；goods 排除 `/internal/**`，user 排除登录/注册，miaosha 全量拦截；order-service 无拦截器（仅内部端点）。
+- **服务间调用用 @LoadBalanced RestClient**：miaosha→goods（`client/GoodsClient`，预热，携带 `X-User-Id: 0` 服务身份）、miaosha→order（`client/HttpSyncOrderClient`，同步降级）、order→goods（`client/HttpGoodsClient`，内部接口无鉴权头）；baseUrl 改为服务名 `http://goods-service` / `http://order-service`，超时（connect 2s / read 3s）、异常处理、业务码还原全部保留。服务直连端口 8081-8084 属内部网络，gateway（8080）是唯一公网入口。
 - **测试基座**：各服务有独立 Testcontainers 基座（order-service 为 `support/AbstractOrderIntegrationTest`，真实 HTTP + 容器内 MySQL/Redis/Kafka，每用例清库）。跑不动通常是 Docker 未启动。
 - **错误码体系**：统一加在 common 的 `CodeMsg`（如 500212 重复下单、500214 库存空、500215 未开始、500216 已结束）。

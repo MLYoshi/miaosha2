@@ -5,6 +5,11 @@ spring:
   application:
     name: miaosha-service
 
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -23,13 +28,13 @@ spring:
         # payload 为纯 JSON {userId, goodsId, requestId}，不给 Step 5 消费侧带类型头
         spring.json.add.type.headers: false
 
-# 预热：经 HTTP 调 goods-service 取 stockCount/endDate
+# 预热：经 HTTP 调 goods-service 取 stockCount/endDate（服务名负载均衡）
 goods:
-  base-url: ${GOODS_BASE_URL:http://localhost:8082}
+  base-url: ${GOODS_BASE_URL:http://goods-service}
 
-# 降级接缝：同步下单指向 order-service（Step 5 端点就绪后生效）
+# 降级接缝：同步下单指向 order-service（服务名负载均衡）
 order:
-  sync-base-url: ${ORDER_SYNC_BASE_URL:http://localhost:8084}
+  sync-base-url: ${ORDER_SYNC_BASE_URL:http://order-service}
 
 management:
   endpoints:

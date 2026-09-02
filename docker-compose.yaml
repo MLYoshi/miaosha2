@@ -60,7 +60,25 @@ services:
       retries: 10
       start_period: 30s
 
-  # 4. 后端：Spring Boot 秒杀服务，容器内通过服务名连接中间件
+  # 4. Nacos：服务注册与发现中心（standalone 单机，HTTP 8848 / 客户端 gRPC 9848）
+  # v2.4.0 起官方镜像提供 arm64 原生支持；服务端 2.4.0 对 2.3.x 客户端协议向后兼容
+  nacos:
+    image: nacos/nacos-server:v2.4.0
+    container_name: seckill-nacos
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false" # 本地开发免鉴权，与 spring-cloud-alibaba 客户端默认一致
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8848/nacos/v1/console/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # 5. 后端：Spring Boot 秒杀服务，容器内通过服务名连接中间件
   backend:
     build: ./backend
     container_name: seckill-backend
@@ -82,7 +100,7 @@ services:
       kafka:
         condition: service_healthy
 
-  # # 5. 前端：Vite 构建产物由 Nginx 托管，/api 反代到 backend 服务
+  # # 6. 前端：Vite 构建产物由 Nginx 托管，/api 反代到 backend 服务
   # frontend:
   #   build:
   #     context: ./frontend

@@ -9,6 +9,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -36,12 +37,13 @@ public class HttpGoodsClient implements GoodsClient {
 
   private final RestClient restClient;
 
-  public HttpGoodsClient(@Value("${goods.base-url}") String goodsBaseUrl) {
+  public HttpGoodsClient(@LoadBalanced RestClient.Builder builder,
+                         @Value("${goods.base-url}") String goodsBaseUrl) {
     SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
     requestFactory.setConnectTimeout((int) CONNECT_TIMEOUT.toMillis());
     requestFactory.setReadTimeout((int) READ_TIMEOUT.toMillis());
     this.restClient =
-        RestClient.builder().baseUrl(goodsBaseUrl).requestFactory(requestFactory).build();
+        builder.baseUrl(goodsBaseUrl).requestFactory(requestFactory).build();
   }
 
   @Override

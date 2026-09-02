@@ -1,9 +1,8 @@
 package com.example.miaosha.client;
 
-import com.example.common.JwtUtil;
 import java.time.LocalDateTime;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -12,13 +11,12 @@ import org.springframework.web.client.RestClient;
  * 商品数据 HTTP 客户端：GET goods-service {@code /goods/detail/{goodsId}}。
  *
  * <p>仅预热链路使用（受理热路径不查商品，F9：Redis 库存闸门先行返回 500214）。
- * goods-service JWT 全量拦截，故携带 Bearer 服务令牌（common 共享密钥签发的
- * 固定服务身份，按请求生成避免 24h 过期）。
+ * goods-service 全量鉴权拦截，故携带 X-User-Id: 0 服务身份头（不对应真实用户）。
  */
 @Component
 public class GoodsClient {
 
-  /** 服务身份 userId：仅用于过 JWT 拦截，不对应真实用户。 */
+  /** 服务身份 userId：仅用于过鉴权拦截，不对应真实用户。 */
   private static final long SERVICE_USER_ID = 0L;
 
   /** 跨服务 HTTP 调用限时，防止 goods-service 挂起拖垮管理线程。 */
@@ -27,11 +25,12 @@ public class GoodsClient {
 
   private final RestClient restClient;
 
-  public GoodsClient(@Value("${goods.base-url}") String goodsBaseUrl) {
+  public GoodsClient(@LoadBalanced RestClient.Builder builder,
+                     @Value("${goods.base-url}") String goodsBaseUrl) {
     SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
     requestFactory.setConnectTimeout((int) CONNECT_TIMEOUT.toMillis());
     requestFactory.setReadTimeout((int) READ_TIMEOUT.toMillis());
-    this.restClient = RestClient.builder().baseUrl(goodsBaseUrl).requestFactory(requestFactory).build();
+    this.restClient = builder.baseUrl(goodsBaseUrl).requestFactory(requestFactory).build();
   }
 
   /**
@@ -45,7 +44,7 @@ public class GoodsClient {
         restClient
             .get()
             .uri("/goods/detail/{goodsId}", goodsId)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + JwtUtil.generateToken(SERVICE_USER_ID))
+            .header("X-User-Id", String.valueOf(SERVICE_USER_ID))
             .retrieve()
             .body(GoodsDetailResponse.class);
 

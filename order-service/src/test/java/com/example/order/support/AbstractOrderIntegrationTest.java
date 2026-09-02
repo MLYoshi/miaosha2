@@ -97,6 +97,8 @@ public abstract class AbstractOrderIntegrationTest {
     registry.add("spring.kafka.consumer.auto-offset-reset", () -> "earliest");
     // goods-service 未启动：GoodsClient 已 mock，base-url 指向死端口占位
     registry.add("goods.base-url", () -> "http://localhost:1");
+    // 测试上下文禁用 Nacos 注册，避免反复连接注册中心
+    registry.add("spring.cloud.nacos.discovery.enabled", () -> "false");
   }
 
   @MockBean protected GoodsClient goodsClient;

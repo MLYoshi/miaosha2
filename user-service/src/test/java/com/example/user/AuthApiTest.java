@@ -23,7 +23,7 @@ class AuthApiTest extends AbstractUserIntegrationTest {
     assertThat(token).isNotBlank();
 
     HttpHeaders headers = new HttpHeaders();
-    headers.setBearerAuth(token);
+    headers.set("X-User-Id", String.valueOf(mobile));
     JsonNode profile =
         body(rest.exchange("/user/profile", HttpMethod.GET, new HttpEntity<>(headers), String.class));
     assertThat(profile.get("code").asInt()).as(profile.toString()).isEqualTo(CODE_SUCCESS);
@@ -55,9 +55,9 @@ class AuthApiTest extends AbstractUserIntegrationTest {
     String token = register.get("data").asText();
     assertThat(token).isNotBlank();
 
-    // 注册返回的 token 与登录 token 同构，可直接访问受保护接口
+    // 注册返回的 token 非空；受保护接口经 X-User-Id 访问
     HttpHeaders headers = new HttpHeaders();
-    headers.setBearerAuth(token);
+    headers.set("X-User-Id", "13000000003");
     JsonNode profile =
         body(rest.exchange("/user/profile", HttpMethod.GET, new HttpEntity<>(headers), String.class));
     assertThat(profile.get("code").asInt()).as(profile.toString()).isEqualTo(CODE_SUCCESS);
@@ -85,12 +85,12 @@ class AuthApiTest extends AbstractUserIntegrationTest {
     assertThat(login.get("code").asInt()).as(login.toString()).isEqualTo(CODE_SUCCESS);
   }
 
-  @Test // F3 无 token / 假 token → 401（user-service 只暴露 user 域接口）
-  void protectedEndpointsRequireValidToken() {
-    assertThat(getWithToken("/user/profile", null).getStatusCode().value()).isEqualTo(401);
+  @Test // F3 无 X-User-Id / 非法 X-User-Id → 401（JWT 校验已上移 gateway）
+  void protectedEndpointsRequireUserId() {
+    assertThat(getWithUserId("/user/profile", null).getStatusCode().value()).isEqualTo(401);
 
     HttpHeaders headers = new HttpHeaders();
-    headers.setBearerAuth("not.a.real.token");
+    headers.set("X-User-Id", "not-a-number");
     assertThat(
             rest.exchange("/user/profile", HttpMethod.GET, new HttpEntity<>(headers), String.class)
                 .getStatusCode()

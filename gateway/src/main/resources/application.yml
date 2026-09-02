@@ -5,21 +5,30 @@ spring:
   application:
     name: gateway
   cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
     gateway:
       routes:
         - id: user-service
-          uri: http://localhost:8081
+          uri: lb://user-service
           predicates:
             - Path=/user/**
         - id: goods-service
-          uri: http://localhost:8082
+          uri: lb://goods-service
           predicates:
             - Path=/goods/**
         - id: miaosha-service
-          uri: http://localhost:8083
+          uri: lb://miaosha-service
           predicates:
             - Path=/miaosha/**
         - id: miaosha-service-admin
-          uri: http://localhost:8083
+          uri: lb://miaosha-service
           predicates:
             - Path=/admin/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

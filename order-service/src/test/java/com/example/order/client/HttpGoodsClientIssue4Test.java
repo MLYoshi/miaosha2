@@ -23,6 +23,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.client.RestClient;
 
 /**
  * {@link HttpGoodsClient} 错误信息保真回归测试（review report Issue 4）：
@@ -82,7 +83,7 @@ class HttpGoodsClientIssue4Test {
   @BeforeEach
   void setUp() {
     stub.set(StubResponse.ok("{}"));
-    client = new HttpGoodsClient("http://localhost:" + server.getAddress().getPort());
+    client = new HttpGoodsClient(RestClient.builder(), "http://localhost:" + server.getAddress().getPort());
 
     Logger clientLogger = (Logger) LoggerFactory.getLogger(HttpGoodsClient.class);
     logWatcher = new ListAppender<>();

@@ -2,7 +2,6 @@ package com.example.miaosha;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.common.JwtUtil;
 import com.example.miaosha.cache.MiaoshaRedisStore;
 import com.example.miaosha.cache.RedisKeyBuilder;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,7 +38,8 @@ import org.testcontainers.utility.DockerImageName;
       "spring.kafka.bootstrap-servers=localhost:9099",
       "spring.kafka.producer.properties.max.block.ms=2000",
       "spring.kafka.producer.properties.delivery.timeout.ms=3000",
-      "spring.kafka.producer.properties.request.timeout.ms=2000"
+      "spring.kafka.producer.properties.request.timeout.ms=2000",
+      "spring.cloud.nacos.discovery.enabled=false"
     })
 class MiaoshaDegradeKafkaTest {
 
@@ -107,7 +107,7 @@ class MiaoshaDegradeKafkaTest {
 
   private ResponseEntity<String> post(String path, long userId) {
     HttpHeaders headers = new HttpHeaders();
-    headers.setBearerAuth(JwtUtil.generateToken(userId));
+    headers.set("X-User-Id", String.valueOf(userId));
     return rest.exchange(path, HttpMethod.POST, new HttpEntity<>(headers), String.class);
   }
 

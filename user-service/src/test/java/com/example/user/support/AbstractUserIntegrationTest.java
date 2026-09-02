@@ -24,7 +24,9 @@ import org.testcontainers.utility.DockerImageName;
  *
  * <p>隔离策略：每个用例前 TRUNCATE miaosha_user（服务端事务无法从测试侧回滚，与 backend 同策略）。
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = "spring.cloud.nacos.discovery.enabled=false")
 public abstract class AbstractUserIntegrationTest {
 
   protected static final String PLAIN_PASSWORD = "123456";
@@ -63,10 +65,10 @@ public abstract class AbstractUserIntegrationTest {
     return rest.exchange(path, HttpMethod.POST, new HttpEntity<>(json, headers), String.class);
   }
 
-  protected ResponseEntity<String> getWithToken(String path, String token) {
+  protected ResponseEntity<String> getWithUserId(String path, String userId) {
     HttpHeaders headers = new HttpHeaders();
-    if (token != null) {
-      headers.setBearerAuth(token);
+    if (userId != null) {
+      headers.set("X-User-Id", userId);
     }
     return rest.exchange(path, HttpMethod.GET, new HttpEntity<>(headers), String.class);
   }

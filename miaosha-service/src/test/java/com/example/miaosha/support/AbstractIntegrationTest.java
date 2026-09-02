@@ -2,7 +2,6 @@ package com.example.miaosha.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.common.JwtUtil;
 import com.example.miaosha.cache.MiaoshaRedisStore;
 import com.example.miaosha.message.KafkaConfig;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -68,6 +67,8 @@ public abstract class AbstractIntegrationTest {
     registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
     registry.add("goods.base-url", () -> "http://localhost:1");
     registry.add("order.sync-base-url", () -> "http://localhost:1");
+    // 测试上下文禁用 Nacos 注册，避免反复连接注册中心
+    registry.add("spring.cloud.nacos.discovery.enabled", () -> "false");
   }
 
   @Autowired protected TestRestTemplate rest;
@@ -90,16 +91,16 @@ public abstract class AbstractIntegrationTest {
   protected ResponseEntity<String> get(String path, Long userId) {
     HttpHeaders headers = new HttpHeaders();
     if (userId != null) {
-      headers.setBearerAuth(JwtUtil.generateToken(userId));
+      headers.set("X-User-Id", String.valueOf(userId));
     }
     return rest.exchange(path, HttpMethod.GET, new HttpEntity<>(headers), String.class);
   }
 
-  /** 带鉴权的 POST（写操作契约：do_miaosha / 预热均为 POST）。 */
+  /** 带身份头的 POST（写操作契约：do_miaosha / 预热均为 POST）。 */
   protected ResponseEntity<String> post(String path, Long userId) {
     HttpHeaders headers = new HttpHeaders();
     if (userId != null) {
-      headers.setBearerAuth(JwtUtil.generateToken(userId));
+      headers.set("X-User-Id", String.valueOf(userId));
     }
     return rest.exchange(path, HttpMethod.POST, new HttpEntity<>(headers), String.class);
   }

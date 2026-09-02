@@ -80,6 +80,7 @@ class RedisDownIntegrationTest {
     registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
     registry.add("spring.kafka.consumer.auto-offset-reset", () -> "earliest");
     registry.add("goods.base-url", () -> "http://localhost:1");
+    registry.add("spring.cloud.nacos.discovery.enabled", () -> "false");
   }
 
   private static int findClosedPort() {

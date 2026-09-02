@@ -2,7 +2,6 @@ package com.example.miaosha;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.common.JwtUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -33,7 +32,8 @@ import org.springframework.test.context.DynamicPropertySource;
       "spring.data.redis.password=",
       "spring.kafka.bootstrap-servers=localhost:9099",
       "goods.base-url=http://localhost:1",
-      "order.sync-base-url=http://localhost:1"
+      "order.sync-base-url=http://localhost:1",
+      "spring.cloud.nacos.discovery.enabled=false"
     })
 class MiaoshaRedisDownTest {
 
@@ -60,7 +60,7 @@ class MiaoshaRedisDownTest {
 
   private ResponseEntity<String> post(String path, long userId) {
     HttpHeaders headers = new HttpHeaders();
-    headers.setBearerAuth(JwtUtil.generateToken(userId));
+    headers.set("X-User-Id", String.valueOf(userId));
     return rest.exchange(path, HttpMethod.POST, new HttpEntity<>(headers), String.class);
   }
 

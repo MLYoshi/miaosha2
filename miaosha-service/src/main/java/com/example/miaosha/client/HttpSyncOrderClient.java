@@ -5,6 +5,7 @@ import com.example.common.MiaoshaException;
 import com.example.common.Result;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -28,11 +29,12 @@ public class HttpSyncOrderClient implements SyncOrderClient {
 
   private final RestClient restClient;
 
-  public HttpSyncOrderClient(@Value("${order.sync-base-url}") String syncBaseUrl) {
+  public HttpSyncOrderClient(@LoadBalanced RestClient.Builder builder,
+                             @Value("${order.sync-base-url}") String syncBaseUrl) {
     SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
     requestFactory.setConnectTimeout((int) CONNECT_TIMEOUT.toMillis());
     requestFactory.setReadTimeout((int) READ_TIMEOUT.toMillis());
-    this.restClient = RestClient.builder().baseUrl(syncBaseUrl).requestFactory(requestFactory).build();
+    this.restClient = builder.baseUrl(syncBaseUrl).requestFactory(requestFactory).build();
   }
 
   @Override

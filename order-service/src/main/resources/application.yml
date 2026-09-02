@@ -5,6 +5,11 @@ spring:
   application:
     name: order-service
 
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/miaosha?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
     username: root
@@ -33,9 +38,9 @@ spring:
     listener:
       ack-mode: manual                                    # 消费者显式调用 Acknowledgment.acknowledge()
 
-# 商品快照 / 扣库存 / 回补：经 HTTP 调 goods-service 内部接口
+# 商品快照 / 扣库存 / 回补：经 HTTP 调 goods-service 内部接口（服务名负载均衡）
 goods:
-  base-url: ${GOODS_BASE_URL:http://localhost:8082}
+  base-url: ${GOODS_BASE_URL:http://goods-service}
 
 mybatis:
   mapper-locations: classpath*:mapper/**/*.xml

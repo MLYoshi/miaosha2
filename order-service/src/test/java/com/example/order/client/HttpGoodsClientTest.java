@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
 
 /**
  * {@link HttpGoodsClient} 错误码分类回归测试（review report Issue 2）：
@@ -83,7 +84,7 @@ class HttpGoodsClientTest {
   void setUp() {
     stub.set(StubResponse.ok("{}"));
     lastRequestUri.set(null);
-    client = new HttpGoodsClient("http://localhost:" + server.getAddress().getPort());
+    client = new HttpGoodsClient(RestClient.builder(), "http://localhost:" + server.getAddress().getPort());
   }
 
   /** 核心回归（Issue 2）：getGoodsVo 收到 500100 → 意外异常（可重试），绝非 MiaoshaException。 */
@@ -176,7 +177,7 @@ class HttpGoodsClientTest {
    */
   @Test
   void deductStock_connectionFailure_rethrowsConnectionExceptionNotMiaosha() {
-    HttpGoodsClient deadClient = new HttpGoodsClient("http://localhost:1");
+    HttpGoodsClient deadClient = new HttpGoodsClient(RestClient.builder(), "http://localhost:1");
 
     assertThatThrownBy(() -> deadClient.deductStock(2L, "req-dead-1"))
         .as("连接失败必须原样上抛连接类异常（意外异常语义），不得还原为业务失败 MiaoshaException")
