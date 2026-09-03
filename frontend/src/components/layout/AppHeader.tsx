@@ -1,11 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { LogOut, ShoppingCart, Shield, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { clearToken, isAuthenticated } from '@/lib/auth';
+import { useAuth } from '@/hooks/useAuth';
 
 export function AppHeader() {
   const navigate = useNavigate();
-  const loggedIn = isAuthenticated();
+  const { loggedIn, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/40 bg-white/70 backdrop-blur-md">
@@ -42,7 +42,7 @@ export function AppHeader() {
               variant="ghost"
               size="sm"
               onClick={() => {
-                clearToken();
+                logout();
                 navigate('/login');
               }}
             >
