@@ -14,6 +14,12 @@
 登录 → 商品 → 提交秒杀 → Redis 预扣 → Kafka 异步落库 → 轮询拿单
 ```
 
+## 界面截图
+
+| 秒杀会场（商品列表） | 商品详情 | 管理端（预热/重置） |
+|---|---|---|
+| ![秒杀会场](docs/screenshots/goods-list.png) | ![商品详情](docs/screenshots/goods-detail.png) | ![管理端](docs/screenshots/admin-dashboard.png) |
+
 ## 服务划分
 
 | 服务 | 端口 | 职责 |
@@ -107,6 +113,8 @@ mvn -pl <module> test -Dtest=ClassX#methodY  # 单个测试方法
 ├── common/           # 公共组件
 ├── db/
 │   └── init/         # MySQL 初始化脚本（01-init.sql，docker compose 首次启动自动执行）
+├── docs/
+│   └── screenshots/  # README 界面截图
 ├── frontend/         # 前端（Vite + React）
 └── docker-compose.yaml
 ```
