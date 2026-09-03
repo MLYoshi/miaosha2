@@ -57,4 +57,15 @@
     WHERE goods_id = #{goodsId}
   </update>
 
+  <update id="updateMiaoshaConfig">
+  UPDATE miaosha_goods
+  <set>
+    <if test="startDate != null">start_date = #{startDate},</if>
+    <if test="endDate != null">end_date = #{endDate},</if>
+    <if test="stockCount != null">stock_count = #{stockCount},</if>
+  </set>
+  WHERE goods_id = #{goodsId}
+  </update>
+
+
 </mapper>

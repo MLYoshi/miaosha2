@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.example.goods.dao.GoodsMapper;
+import java.time.Clock;
 import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,8 @@ class GoodsServiceDeductIdempotencyTest {
     StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
     valueOps = mock(ValueOperations.class);
     BDDMockito.given(redisTemplate.opsForValue()).willReturn(valueOps);
-    goodsService = new GoodsService(goodsMapper, windowService, redisTemplate);
+    goodsService =
+        new GoodsService(goodsMapper, windowService, redisTemplate, mock(Clock.class));
   }
 
   @Test // 首次扣减：条件 UPDATE + 缓存影响行数

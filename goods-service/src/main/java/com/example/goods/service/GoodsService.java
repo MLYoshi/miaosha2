@@ -1,10 +1,16 @@
 package com.example.goods.service;
 
+import com.example.common.CodeMsg;
+import com.example.common.MiaoshaException;
 import com.example.goods.dao.GoodsMapper;
 import com.example.goods.domain.Goods;
 import com.example.goods.vo.GoodsDetailVo;
 import com.example.goods.vo.GoodsVo;
+import com.example.goods.vo.MiaoshaConfigVo;
+
+import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,14 +31,17 @@ public class GoodsService {
   private final GoodsMapper goodsMapper;
   private final MiaoshaWindowService windowService;
   private final StringRedisTemplate redisTemplate;
+  private final Clock clock;
 
   public GoodsService(
       GoodsMapper goodsMapper,
       MiaoshaWindowService windowService,
-      StringRedisTemplate redisTemplate) {
+      StringRedisTemplate redisTemplate,
+      Clock clock) {
     this.goodsMapper = goodsMapper;
     this.windowService = windowService;
     this.redisTemplate = redisTemplate;
+    this.clock = clock;
   }
 
   public Goods getById(Long id) {
@@ -53,8 +62,8 @@ public class GoodsService {
       return null;
     }
 
-    MiaoshaWindowService.WindowStatus status =
-        windowService.resolveStatus(goodsVo.getStartDate(), goodsVo.getEndDate());
+    MiaoshaWindowService.WindowStatus status = windowService.resolveStatus(goodsVo.getStartDate(),
+        goodsVo.getEndDate());
     return new GoodsDetailVo(goodsVo, status.status(), status.remainSeconds());
   }
 
@@ -62,7 +71,8 @@ public class GoodsService {
    * 条件扣减秒杀库存，返回影响行数：1 成功 / 0 库存不足。
    * 防超卖语义由 SQL 条件更新保证（stock_count > 0）。
    *
-   * <p>requestId 幂等（review report Issue 1：扣减结果二义性 × Kafka 自动重试 → 重复扣库存）：
+   * <p>
+   * requestId 幂等（review report Issue 1：扣减结果二义性 × Kafka 自动重试 → 重复扣库存）：
    * order-service 扣减响应丢失后整条消息重放，同一 requestId 第二次到达时直接返回缓存的
    * 上次影响行数，不再执行条件 UPDATE——保证「1 个订单 ↔ 1 次 DB 扣减」。
    * 幂等缓存尽力而为：Redis 不可用时降级为直接扣减（宁少卖不超卖，方向与基线一致）。
@@ -99,4 +109,32 @@ public class GoodsService {
   public int restoreStock(Long goodsId) {
     return goodsMapper.restoreStock(goodsId);
   }
+
+  /**
+   * 重置秒杀配置：时间窗对齐到当前时刻（start=now，end=now+durationMinutes），
+   * 可选重置 miaosha_goods.stock_count。返回重置后的配置供调用方回显与预热。
+   */
+  public MiaoshaConfigVo updateMiaoshaConfig(Long goodsId, long durationMinutes, Integer stockCount) {
+    if (durationMinutes <= 0) {
+      throw new MiaoshaException(CodeMsg.PARAM_ERROR);
+    }
+    if (stockCount != null && stockCount < 0) {
+      throw new MiaoshaException(CodeMsg.PARAM_ERROR);
+    }
+    GoodsVo goods = goodsMapper.getGoodsVo(goodsId);
+    if (goods == null) {
+      throw new MiaoshaException(CodeMsg.GOODS_NOT_EXIST);
+    }
+    LocalDateTime start = LocalDateTime.now(clock);
+    LocalDateTime end = start.plusMinutes(durationMinutes);
+    int rows = goodsMapper.updateMiaoshaConfig(goodsId, start, end, stockCount);
+    if (rows == 0) {
+      // 查询与更新间隙被删除的并发兜底
+      throw new MiaoshaException(CodeMsg.GOODS_NOT_EXIST);
+    }
+    int finalStock = stockCount != null ? stockCount : goods.getStockCount();
+    log.info("重置秒杀配置 goodsId={} start={} end={} stock={}", goodsId, start, end, finalStock);
+    return new MiaoshaConfigVo(goodsId, start, end, finalStock);
+  }
+
 }

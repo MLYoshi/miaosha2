@@ -1,11 +1,16 @@
 package com.example.miaosha.client;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+
+import com.example.common.CodeMsg;
+import com.example.common.MiaoshaException;
 
 /**
  * 商品数据 HTTP 客户端：GET goods-service {@code /goods/detail/{goodsId}}。
@@ -123,4 +128,69 @@ public class GoodsClient {
       this.data = data;
     }
   }
+
+    /**
+   * 重置秒杀配置（管理接口专用）：调 goods-service 内部接口落库时间窗/库存。
+   * 携带 X-User-Id: 0 服务身份头，与 getGoodsSnapshot 一致。
+   *
+   * @throws RestClientException 连接类异常向上抛
+   * @throws MiaoshaException goods-service 返回业务错误（商品不存在/参数非法）时还原
+   */
+  public MiaoshaConfig updateMiaoshaConfig(Long goodsId, long durationMinutes, Integer stockCount) {
+    MiaoshaConfigResponse resp =
+        restClient
+            .post()
+            .uri(
+                uriBuilder ->
+                    uriBuilder
+                        .path("/internal/goods/{goodsId}/miaosha-config")
+                        .queryParam("durationMinutes", durationMinutes)
+                        .queryParamIfPresent("stockCount", Optional.ofNullable(stockCount))
+                        .build(goodsId))
+            .header("X-User-Id", String.valueOf(SERVICE_USER_ID))
+            .retrieve()
+            .body(MiaoshaConfigResponse.class);
+
+    if (resp == null || resp.getCode() != 0 || resp.getData() == null) {
+      // goods-service 的全局异常处理器把 MiaoshaException 转成了 Result 错误码，这里还原成本地异常
+      throw new MiaoshaException(CodeMsg.SERVER_ERROR);
+    }
+    return resp.getData();
+  }
+
+  /** 重置后的秒杀配置（与 goods-service MiaoshaConfigVo 的 JSON 字段对齐，不直接依赖对方类）。 */
+  public record MiaoshaConfig(
+      Long goodsId, LocalDateTime startDate, LocalDateTime endDate, Integer stockCount) {}
+
+  /** 内部接口响应壳（Result 同构）。 */
+  static class MiaoshaConfigResponse {
+    private int code;
+    private String msg;
+    private MiaoshaConfig data;
+
+    public int getCode() {
+      return code;
+    }
+
+    public String getMsg() {
+      return msg;
+    }
+
+    public MiaoshaConfig getData() {
+      return data;
+    }
+
+    public void setCode(int code) {
+      this.code = code;
+    }
+
+    public void setMsg(String msg) {
+      this.msg = msg;
+    }
+
+    public void setData(MiaoshaConfig data) {
+      this.data = data;
+    }
+  }
+
 }
