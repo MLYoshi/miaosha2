@@ -33,7 +33,7 @@ mvn -pl miaosha-service test -Dtest=MiaoshaAcceptServiceTest#方法名  # 单个
 
 跨服务 HTTP 客户端（均带 2s 连接 / 3s 读超时）：
 
-- `client/GoodsClient` → goods-service `GET /goods/detail/{id}`，**仅预热链路使用**。goods-service JWT 全量拦截，故用 common `JwtUtil` 按请求签发服务令牌（固定身份 userId=0，避免 token 过期）。
+- `client/GoodsClient` → goods-service `GET /goods/detail/{id}`（预热链路）与 `PUT /internal/goods/{id}/miaosha-config`（重置秒杀配置）。预热带服务令牌（common `JwtUtil` 按请求签发，固定身份 userId=0，避免 token 过期）；`/internal/**` 无需鉴权头。
 - `client/HttpSyncOrderClient` → order-service `POST /internal/orders/sync`（降级同步下单）。业务码非 0 时还原为 common `CodeMsg` 异常，保持与单体一致的用户可见语义。
 - 响应壳均为手写的 Result 同构 DTO（`GoodsDetailResponse` / `SyncOrderResponse`），**禁止 import 其他服务的 Entity/VO**。
 
@@ -79,6 +79,6 @@ tryMiaosha(Lua 原子: 防重 → 查库存 → DECR → 置 PROCESSING)
 ## 其他约定
 
 - `Clock` 经 `config/ClockConfig` 注入（预热 TTL 计算用），测试可注入固定时钟，不要直接 `LocalDateTime.now()`。
-- Controller 只做 HTTP 翻译；`MiaoshaException` 统一由 `common/GlobalExceptionHandler` 转 `Result.error`，Controller 不做二次转换。管理动作挂 `/admin/**`（`AdminController`）。
+- Controller 只做 HTTP 翻译；`MiaoshaException` 统一由 `common/GlobalExceptionHandler` 转 `Result.error`，Controller 不做二次转换。管理动作挂 `/admin/**`（`AdminController`）：`POST /admin/goods/{id}/preheat` 库存预热、`POST /admin/goods/{id}/miaosha` 重置秒杀配置（先经 GoodsClient 落库新窗口/库存，再重写本服务 Redis 预扣库存 Key，TTL 按新 endDate 重算）。
 - 预热 TTL：活动结束 + 30 分钟 buffer，最小 1 小时，endDate 缺省 1 天。
 - JVM 时区必须 `Asia/Shanghai`（时间窗校验），本地中间件 `docker compose up -d mysql redis kafka`。

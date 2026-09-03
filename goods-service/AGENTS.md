@@ -10,7 +10,7 @@
 
 - **对外与内部接口隔离**：
   - `GoodsController`（`/goods/**`）：商品列表、详情（带秒杀窗口状态）。受 JWT 拦截。
-  - `InternalGoodsController`（`/internal/goods/**`）：仅供 order-service 服务间调用（RestClient，见 order-service `client/HttpGoodsClient`），不走 JWT（`WebConfig` 放行 `/internal/**`）。提供商品快照、条件扣减库存、回补库存（Saga 补偿）。
+  - `InternalGoodsController`（`/internal/goods/**`）：仅供 order-service / miaosha-service 服务间调用（RestClient），不走 JWT（`WebConfig` 放行 `/internal/**`）。提供商品快照、条件扣减库存、回补库存（Saga 补偿）、更新秒杀配置（`PUT /internal/goods/{goodsId}/miaosha-config`，时间窗对齐 + 可选重置库存）。
   - `AdminController`（`/admin/**`）：管理端写操作接缝（当前仅库存预热）。gateway 把 `/admin/**` 路由到 miaosha-service 而非本服务，此处接口仅限服务内/直连调用。
 - **时间窗口唯一规则源**：`MiaoshaWindowService` 是全系统秒杀窗口边界的唯一定义处（详情页 `resolveStatus` 与下单 `checkInWindow` 两个薄接口共用）。边界语义：null startDate=立即开始、null endDate=永不过期、起止边界均含端点。改窗口判断只改这一处。
 - **时钟可注入**：所有 `LocalDateTime.now()` 必须通过注入的 `Clock` bean（`ClockConfig`）获取，禁止直接 `now()`，否则测试无法控制时间。
