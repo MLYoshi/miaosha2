@@ -74,4 +74,4 @@ mvn -pl order-service test -Dtest=ClassX#methodY                  # 单个方法
 ```bash
 mvn -pl order-service -am spring-boot:run    # 依赖 localhost 的 MySQL/Redis/Kafka，另需 goods-service 在 8082
 ```
-中间件：仓库根 `docker compose up -d mysql redis kafka`；新库先跑 `backend/sql/fix-seed-time-window.sql`。连接可用 `MYSQL_HOST/PORT`、`REDIS_HOST/PORT`、`KAFKA_BOOTSTRAP_SERVERS`、`GOODS_BASE_URL` 覆盖。
+中间件：仓库根 `docker compose up -d mysql redis kafka`；MySQL 首次启动自动执行 `db/init/01-init.sql`（建表 + 种子数据 + 动态时间窗），重新初始化需清空 `db/mysql_data`。连接可用 `MYSQL_HOST/PORT`、`REDIS_HOST/PORT`、`KAFKA_BOOTSTRAP_SERVERS`、`GOODS_BASE_URL` 覆盖。

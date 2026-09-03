@@ -1,7 +1,6 @@
-# 数据库：schema 与种子数据见 backend/docs/db-design.md（旧 miaosha.sql 业务模型的人工维护版）
-# 新克隆项目若 mysql_data 为空，直接执行自包含种子脚本（含建表 + 种子数据 + 时间窗修正）：
-#   docker exec -i seckill-mysql mysql -uroot -proot --default-character-set=utf8mb4 < backend/sql/fix-seed-time-window.sql
-# 详细说明见 backend/sql/README.md
+# 数据库：建表 + 种子数据见 db/init/01-init.sql（自包含脚本）
+# MySQL 首次启动时经 /docker-entrypoint-initdb.d 自动执行（仅当 ./db/mysql_data 为空时执行一次）。
+# 修改 01-init.sql 后重新初始化：docker compose down -v 并清空 ./db/mysql_data，再 docker compose up -d。
 services:
   # 1. MySQL：用于最终订单落地和数据持久化
   mysql:
@@ -11,8 +10,10 @@ services:
       - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root
+      TZ: Asia/Shanghai # 保证种子脚本 NOW() 与 JVM Asia/Shanghai 时区一致，否则时间窗校验误判
     volumes:
-      - ./backend/mysql_data:/var/lib/mysql
+      - ./db/mysql_data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d # 首次启动自动执行 01-init.sql（建表 + 种子数据）
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
       interval: 10s
@@ -78,37 +79,15 @@ services:
       retries: 10
       start_period: 30s
 
-  # 5. 后端：Spring Boot 秒杀服务，容器内通过服务名连接中间件
-  backend:
-    build: ./backend
-    container_name: seckill-backend
-    ports:
-      - "8080:8080"
-    environment:
-      TZ: Asia/Shanghai # JVM 默认时区必须与 SQL 种子/准备脚本的 +08:00 时间窗一致，否则 checkInWindow 误判「秒杀未开始」
-      MYSQL_HOST: mysql
-      MYSQL_PORT: "3306"
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
-      KAFKA_HOST: kafka
-      KAFKA_PORT: "9094"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-
-  # # 6. 前端：Vite 构建产物由 Nginx 托管，/api 反代到 backend 服务
+  # 5. 前端：Vite 构建产物由 Nginx 托管，/user /goods /miaosha /admin 反代到 gateway 服务
   # frontend:
   #   build:
   #     context: ./frontend
   #     args:
-  #       BACKEND_HOST: backend
+  #       BACKEND_HOST: gateway
   #       BACKEND_PORT: "8080"
   #   container_name: seckill-frontend
   #   ports:
   #     - "5173:80"
   #   depends_on:
-  #     - backend
+  #     - gateway

@@ -27,7 +27,7 @@ mvn -pl goods-service -am clean package -DskipTests
 mvn -pl goods-service -am spring-boot:run
 ```
 
-依赖根目录 docker compose 的 MySQL（`miaosha` 库）；连接可用 `MYSQL_HOST/PORT` 覆盖。联调报「未开始/已结束」先跑 `backend/sql/fix-seed-time-window.sql` 对齐时间窗（见根 AGENTS.md）。
+依赖根目录 docker compose 的 MySQL（`miaosha` 库）；连接可用 `MYSQL_HOST/PORT` 覆盖。MySQL 首次启动自动执行 `db/init/01-init.sql` 建表 + 种子数据（时间窗由 `NOW()` 动态生成，见根 AGENTS.md）。
 
 ## 约定
 

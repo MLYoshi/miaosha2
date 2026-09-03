@@ -46,14 +46,19 @@
 docker compose up -d mysql redis kafka nacos
 ```
 
-### 3. 初始化数据库（建表 + 种子数据 + 秒杀时间窗对齐）
+### 3. 初始化数据库
 
-```bash
-docker exec -i seckill-mysql mysql -uroot -proot --default-character-set=utf8mb4 \
-  < backend/sql/fix-seed-time-window.sql
-```
+无需手动执行：MySQL 首次启动时会自动执行 `db/init/01-init.sql`（建库 + 建表 + 种子数据），秒杀时间窗由 `NOW()` 动态生成，任何时刻初始化都在窗口内。
 
-> 时间窗未对齐时秒杀接口会报「已结束」，联调报「未开始/已结束」先重跑此脚本。
+> 注意：`/docker-entrypoint-initdb.d` 仅在 `./db/mysql_data` 数据目录为空时执行一次。修改 `01-init.sql` 后需重新初始化：
+>
+> ```bash
+> docker compose down -v
+> rm -rf ./db/mysql_data
+> docker compose up -d
+> ```
+
+内置测试账号：手机号 `13800000001` ~ `13800000005`，密码均为 `123456`。
 
 ### 4. 构建与启动微服务
 
@@ -100,6 +105,8 @@ mvn -pl <module> test -Dtest=ClassX#methodY  # 单个测试方法
 ├── miaosha-service/  # 秒杀服务 (8083)
 ├── order-service/    # 订单服务 (8084)
 ├── common/           # 公共组件
-├── backend/          # 旧单体（事实基线，迁移期间保留）
+├── db/
+│   └── init/         # MySQL 初始化脚本（01-init.sql，docker compose 首次启动自动执行）
+├── frontend/         # 前端（Vite + React）
 └── docker-compose.yaml
 ```
