@@ -61,6 +61,26 @@ services:
       retries: 10
       start_period: 30s
 
+  # 3.1 Kafka topic 初始化：broker 已关闭自动建 topic（KAFKA_AUTO_CREATE_TOPICS_ENABLE=false），
+  # 必须显式创建 seckill-order（秒杀异步下单）与 seckill-order-dlt（死信），否则
+  # miaosha-service 发送消息失败 → 每次抢购都走同步降级且响应超时，前端表现为「点了没反应」。
+  # 一次性任务，执行完即退出（restart: "no"）。
+  kafka-init:
+    image: apache/kafka:4.3.1
+    container_name: seckill-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9094 --create --if-not-exists \
+          --topic seckill-order --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9094 --create --if-not-exists \
+          --topic seckill-order-dlt --partitions 1 --replication-factor 1
+        echo 'kafka topics ready'
+
   # 4. Nacos：服务注册与发现中心（standalone 单机，HTTP 8848 / 客户端 gRPC 9848）
   # v2.4.0 起官方镜像提供 arm64 原生支持；服务端 2.4.0 对 2.3.x 客户端协议向后兼容
   nacos:
