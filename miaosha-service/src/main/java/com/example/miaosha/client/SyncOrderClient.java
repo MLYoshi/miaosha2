@@ -3,7 +3,7 @@ package com.example.miaosha.client;
 /**
  * 同步下单降级接缝（本步骤唯一的新接缝，Step 5 明确的拆分点）。
  *
- * <p>受理编排只依赖本接口，不感知 HTTP 细节：生产实现 {@link HttpSyncOrderClient}
+ * <p>受理编排只依赖本接口，不感知 HTTP 细节：生产实现 {@link OrderFeignClient}
  * 走 order-service；测试用假实现等价替换（支持注入失败）。
  *
  * <p>幂等与兜底语义（DB 条件扣库存 + {@code miaosha_order} 唯一键）全部在

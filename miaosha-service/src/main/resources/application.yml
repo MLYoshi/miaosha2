@@ -36,6 +36,15 @@ goods:
 order:
   sync-base-url: ${ORDER_SYNC_BASE_URL:http://order-service}
 
+# OpenFeign：跨服务调用限时（对齐原 RestClient 实现 connect 2s / read 3s）
+spring.cloud.openfeign.client.config:
+  order-service:
+    connect-timeout: 2000
+    read-timeout: 3000
+  goods-service:
+    connect-timeout: 2000
+    read-timeout: 3000
+
 management:
   endpoints:
     web:

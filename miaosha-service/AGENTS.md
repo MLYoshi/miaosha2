@@ -29,13 +29,13 @@ mvn -pl miaosha-service test -Dtest=MiaoshaAcceptServiceTest#方法名  # 单个
 |---|---|---|
 | `cache/MiaoshaRedisStore` | `RedisMiaoshaStore`（Lua） | `support/InMemoryMiaoshaRedisStore` |
 | `message/OrderMessageSender` | `OrderMessageProducer`（Kafka） | `support/FakeOrderMessageSender` |
-| `client/SyncOrderClient` | `HttpSyncOrderClient`（RestClient） | `support/FakeSyncOrderClient` |
+| `client/SyncOrderClient` | `OrderFeignClient`（OpenFeign） | `support/FakeSyncOrderClient` |
 
-跨服务 HTTP 客户端（均带 2s 连接 / 3s 读超时）：
+跨服务 HTTP 客户端（OpenFeign 声明式，静态 url，均带 2s 连接 / 3s 读超时，超时配置在 `spring.cloud.openfeign.client.config.<服务名>`）：
 
-- `client/GoodsClient` → goods-service `GET /goods/detail/{id}`（预热链路）与 `PUT /internal/goods/{id}/miaosha-config`（重置秒杀配置）。预热带服务令牌（common `JwtUtil` 按请求签发，固定身份 userId=0，避免 token 过期）；`/internal/**` 无需鉴权头。
-- `client/HttpSyncOrderClient` → order-service `POST /internal/orders/sync`（降级同步下单）。业务码非 0 时还原为 common `CodeMsg` 异常，保持与单体一致的用户可见语义。
-- 响应壳均为手写的 Result 同构 DTO（`GoodsDetailResponse` / `SyncOrderResponse`），**禁止 import 其他服务的 Entity/VO**。
+- `client/GoodsClient` → goods-service `GET /goods/detail/{id}`（预热链路）与 `POST /internal/goods/{id}/miaosha-config`（重置秒杀配置）。detail 端点带服务身份头 `X-User-Id: 0`（不对应真实用户，仅过 goods-service 全量鉴权）；`/internal/**` 无需鉴权头。
+- `client/OrderFeignClient` → order-service `POST /internal/orders/sync`（降级同步下单，OpenFeign 声明式，静态 url = `order.sync-base-url`，超时 2s/3s 由 `spring.cloud.openfeign.client.config.order-service` 配置）。业务码非 0 时在 default 桥接方法中还原为 common `CodeMsg` 异常，保持与单体一致的用户可见语义。
+- 响应壳均为手写的 Result 同构 DTO（`GoodsDetailResponse` / `SyncOrderResponse`），**禁止 import 其他服务的 Entity/VO**；桥接 default 方法承载业务码还原，Feign 注解方法只声明端点。
 
 地址配置：`goods.base-url`、`order.sync-base-url`（`application.yml`，可用 `GOODS_BASE_URL` / `ORDER_SYNC_BASE_URL` 环境变量覆盖）。
 
