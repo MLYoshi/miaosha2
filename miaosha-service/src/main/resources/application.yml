@@ -10,6 +10,17 @@ spring:
       discovery:
         server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
 
+    # OpenFeign：跨服务调用限时（对齐原 RestClient 实现 connect 2s / read 3s）
+    openfeign:
+      client:
+        config:
+          order-service:
+            connect-timeout: 2000
+            read-timeout: 3000
+          goods-service:
+            connect-timeout: 2000
+            read-timeout: 3000
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -35,15 +46,6 @@ goods:
 # 降级接缝：同步下单指向 order-service（服务名负载均衡）
 order:
   sync-base-url: ${ORDER_SYNC_BASE_URL:http://order-service}
-
-# OpenFeign：跨服务调用限时（对齐原 RestClient 实现 connect 2s / read 3s）
-spring.cloud.openfeign.client.config:
-  order-service:
-    connect-timeout: 2000
-    read-timeout: 3000
-  goods-service:
-    connect-timeout: 2000
-    read-timeout: 3000
 
 management:
   endpoints:
