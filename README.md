@@ -14,6 +14,86 @@
 登录 → 商品 → 提交秒杀 → Redis 预扣 → Kafka 异步落库 → 轮询拿单
 ```
 
+## 架构图
+
+### 整体架构
+
+```mermaid
+flowchart TB
+    subgraph Client["客户端"]
+        WEB["前端 Vite + React<br/>localhost:5173"]
+    end
+
+    subgraph MW["中间件"]
+        NACOS[("Nacos<br/>服务注册/发现")]
+        MYSQL[("MySQL 8<br/>miaosha_user / goods<br/>order_info / miaosha_order")]
+        REDIS[("Redis 7<br/>库存预扣 / 秒杀结果")]
+        KAFKA{{"Kafka 4.x (KRaft)<br/>topic: seckill-order<br/>dlt: seckill-order-dlt"}}
+    end
+
+    subgraph SVC["微服务"]
+        GW["gateway :8080<br/>路由 + JWT 鉴权<br/>下发 X-User-Id"]
+        USER["user-service :8081<br/>注册/登录/JWT 签发"]
+        GOODS["goods-service :8082<br/>商品/库存/时间窗"]
+        MIAO["miaosha-service :8083<br/>秒杀受理 / Lua 预扣<br/>Kafka Producer"]
+        ORDER["order-service :8084<br/>Kafka Consumer<br/>订单落库/幂等"]
+    end
+
+    WEB -->|"HTTP / Bearer Token"| GW
+    GW -->|"/user/**"| USER
+    GW -->|"/goods/**"| GOODS
+    GW -->|"/miaosha/** · /admin/**"| MIAO
+
+    MIAO -.->|"预扣 Lua 原子执行"| REDIS
+    MIAO -->|"异步下单消息"| KAFKA
+    MIAO -.->|"Kafka 不可用降级同步调用"| ORDER
+    KAFKA -->|"手动 ack · 重试 1s/2s/4s"| ORDER
+    ORDER -->|"条件更新扣库存<br/>/internal/**"| GOODS
+    ORDER -->|"结果写回 Redis"| REDIS
+    ORDER --> MYSQL
+    GOODS --> MYSQL
+    USER --> MYSQL
+    MIAO -.->|"预热：库存/时间窗"| GOODS
+
+    SVC -.->|"注册与发现"| NACOS
+```
+
+### 秒杀核心链路
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as 客户端
+    participant G as gateway
+    participant M as miaosha-service
+    participant R as Redis
+    participant K as Kafka
+    participant O as order-service
+    participant DB as MySQL
+
+    C->>G: POST /miaosha/do_miaosha (Bearer token)
+    G->>G: 剥离伪造 X-User-Id → 校验 JWT → 下发 X-User-Id
+    G->>M: 转发请求
+    M->>M: 参数校验 + 秒杀时间窗校验
+    M->>R: 执行 miaosha_try.lua（校验 → 防重 → 扣库存 → 置 PROCESSING）
+    alt 预扣失败（售罄/重复/未开始）
+        R-->>M: 失败码
+        M-->>C: 直接返回失败，不落库
+    else 预扣成功
+        R-->>M: SUCCESS
+        M-->>C: 立即返回「排队中」
+        M->>K: 发送 seckill-order 消息
+        K->>O: 投递（Consumer 手动 ack）
+        O->>DB: INSERT miaosha_order（UNIQUE 防重）
+        O->>DB: UPDATE goods SET stock_count = stock_count - 1 WHERE stock_count > 0
+        O->>R: 写入秒杀结果（订单号 / 失败原因）
+        O-->>K: ack（业务失败补偿后 ack；意外异常重试 3 次 → 死信）
+        C->>M: 轮询 /miaosha/result
+        M->>R: 查询结果
+        M-->>C: 成功（订单号）或失败原因
+    end
+```
+
 ## 界面截图
 
 | 秒杀会场（商品列表） | 商品详情 | 管理端（预热/重置） |
