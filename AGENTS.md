@@ -99,7 +99,7 @@ miaosha-service                          order-service
 - **防重复下单**：`miaosha_order` 的 `UNIQUE(user_id, goods_id)`，直接 INSERT 捕获冲突，不先查后插。
 - **Redis 预扣**：Lua 脚本原子执行（检查 → 防重 → 扣库存 → 置 PROCESSING），脚本在 `miaosha-service/src/main/resources/scripts/`，Redis key 统一由各模块 `RedisKeyBuilder` 构建。
 - **降级接缝**：miaosha-service 通过接口 `OrderMessageSender`/`SyncOrderClient` 解耦 Kafka 与 HTTP，便于测试替身（见 `FakeOrderMessageSender` 等测试支持类）。
-- **预热**：`MiaoshaPreheatService`（miaosha）与 `StockPreheatService`（goods）经 HTTP 服务名调用同步库存/时间窗到 Redis，管理端触发。
+- **预热**：`MiaoshaPreheatService`（miaosha-service）经 HTTP 服务名调用 goods-service 取库存/时间窗写入 Redis，管理端触发。Redis 预扣 Key 只由 miaosha-service 维护，goods-service 不引入 Redis 依赖。
 - **时间窗**：`MiaoshaWindowService`（goods/order 各有一份）校验秒杀开始/结束时间，种子数据按 `Asia/Shanghai` +08:00 生成。
 
 ### 前端分层（详见 frontend/AGENTS.md）

@@ -11,11 +11,11 @@
 - **对外与内部接口隔离**：
   - `GoodsController`（`/goods/**`）：商品列表、详情（带秒杀窗口状态）。受 JWT 拦截。
   - `InternalGoodsController`（`/internal/goods/**`）：仅供 order-service / miaosha-service 服务间调用（RestClient），不走 JWT（`WebConfig` 放行 `/internal/**`）。提供商品快照、条件扣减库存、回补库存（Saga 补偿）、更新秒杀配置（`PUT /internal/goods/{goodsId}/miaosha-config`，时间窗对齐 + 可选重置库存）。
-  - `AdminController`（`/admin/**`）：管理端写操作接缝（当前仅库存预热）。gateway 把 `/admin/**` 路由到 miaosha-service 而非本服务，此处接口仅限服务内/直连调用。
+  - 本服务不暴露管理端接口：`/admin/**` 统一由 gateway 路由到 miaosha-service，管理动作（预热 Redis 库存、重置秒杀配置）在 miaosha-service 编排，需要落库的字段经 `/internal/goods/{goodsId}/miaosha-config` 回调本服务。勿在本模块新增 `/admin/**` 端点。
 - **时间窗口唯一规则源**：`MiaoshaWindowService` 是全系统秒杀窗口边界的唯一定义处（详情页 `resolveStatus` 与下单 `checkInWindow` 两个薄接口共用）。边界语义：null startDate=立即开始、null endDate=永不过期、起止边界均含端点。改窗口判断只改这一处。
 - **时钟可注入**：所有 `LocalDateTime.now()` 必须通过注入的 `Clock` bean（`ClockConfig`）获取，禁止直接 `now()`，否则测试无法控制时间。
 - **防超卖在 SQL 层**：`GoodsMapper.reduceStock` 是条件更新 `stock_count > 0`（与基线 `backend` 的 `MiaoshaGoodsMapper.reduceStock` 逐字对齐），影响行数 0 = 库存不足。禁止改成先查再改。`restoreStock` 无条件 +1，幂等性由调用方（order-service 编排）保证，本服务不判重。
-- **不引入 Redis**：`StockPreheatService` 只做 DB 读取校验；Redis `setStock` 预热与预扣 Key 归 miaosha-service，不要把 Redis 依赖加进本模块。
+- **不引入 Redis**：Redis 的 `setStock` 预热与预扣 Key 全部归 miaosha-service 维护，本模块只负责 DB 层的库存条件扣减与回补，不要把 Redis 依赖加进本模块。
 - **JWT**：`JwtInterceptor` 校验 `Authorization: Bearer` 并把 userId 放入 request attribute。goods-service 没有登录接口，除 `/internal/**` 外全量拦截。
 
 ## 构建与运行

@@ -24,7 +24,8 @@ import org.mockito.BDDMockito;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 /**
- * 重置秒杀配置单测（管理端接口 POST /admin/goods/{goodsId}/miaosha 的落库环节）：
+ * 重置秒杀配置单测（管理端接口 POST /admin/goods/{goodsId}/miaosha 的落库环节，
+ * 由 miaosha-service 经 POST /internal/goods/{goodsId}/miaosha-config 回调本服务）：
  * 正常重置（含/不含库存）、参数非法、商品不存在。时钟用固定 Clock，窗口断言精确到秒。
  */
 class GoodsServiceUpdateMiaoshaConfigTest {
